@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Трекер привычек</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #fff8f0 0%, #ffe8d6 100%);
+    min-height: 100vh;
+    color: #3d2b1f;
+    padding: 24px 16px;
+    line-height: 1.5;
+  }
+
+  .app { max-width: 720px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 16px; }
+  h1 { color: #8a4a12; font-size: 1.7rem; font-weight: 700; margin-bottom: 4px; }
+  .week-label { color: #a06a3d; font-size: 0.85rem; font-weight: 500; min-height: 1.2em; }
+
+  /* ---- Вкладки ---- */
+  .view-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 214, 165, 0.4);
+    padding: 4px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  .view-tab {
+    flex: 1;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #a06a3d;
+    padding: 9px 14px;
+    border-radius: 9px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+  }
+  .view-tab.active {
+    background: #fff;
+    color: #8a4a12;
+    box-shadow: 0 2px 6px rgba(181, 101, 29, 0.15);
+  }
+  .view-tab:not(.active):hover { color: #8a4a12; }
+
+  /* ---- Форма ---- */
+  .add-form { display: flex; gap: 8px; margin-bottom: 20px; }
+  .add-form input {
+    flex: 1; padding: 12px 16px;
+    border: 1.5px solid #ffd6a5; border-radius: 12px;
+    font-family: inherit; font-size: 0.95rem;
+    background: #fff; color: #3d2b1f;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-width: 0;
+  }
+  .add-form input:focus {
+    outline: none; border-color: #f4a261;
+    box-shadow: 0 0 0 3px rgba(244, 162, 97, 0.2);
+  }
+  .add-form button {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #f4a261, #e07b39);
+    color: #fff; border: none; border-radius: 12px;
+    font-family: inherit; font-weight: 700; font-size: 1rem;
+    cursor: pointer; flex-shrink: 0;
+    transition: transform 0.15s, box-shadow 0.2s;
+  }
+  .add-form button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(224, 123, 57, 0.35);
+  }
+  .add-form button:active { transform: scale(0.97); }
+
+  /* ---- Режимы ---- */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---- Недельный режим ---- */
+  .habits { display: flex; flex-direction: column; gap: 12px; }
+
+  .habit {
+    background: #fff;
+    border: 1px solid #ffd6a5;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(181, 101, 29, 0.08);
+    animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .habit-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .habit-name {
+    flex: 1; font-weight: 600; font-size: 1rem;
+    color: #3d2b1f; word-break: break-word; min-width: 0;
+  }
+  .habit-streak {
+    font-size: 0.8rem; font-weight: 700; color: #b5651d;
+    background: #fff1e0; padding: 3px 10px; border-radius: 20px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .habit-streak.zero { opacity: 0.5; }
+
+  .habit-delete {
+    width: 28px; height: 28px; border: none; border-radius: 50%;
+    background: transparent; color: #a06a3d; font-size: 0.9rem;
+    cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+    transition: background 0.2s, color 0.2s;
+  }
+  .habit-delete:hover { background: #ffe8d6; color: #c62828; }
+
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+
+  .day {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px; background: none; border: none; padding: 0;
+    cursor: pointer; font-family: inherit; color: inherit;
+  }
+  .day-label {
+    font-size: 0.7rem; font-weight: 600; color: #a06a3d;
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .day-circle {
+    width: 100%; aspect-ratio: 1; max-width: 40px;
+    border-radius: 50%; border: 2px solid #ffd6a5;
+    background: #fff8f0; display: flex; align-items: center;
+    justify-content: center; font-size: 1rem; color: transparent;
+    font-weight: 700;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+  }
+  .day:hover .day-circle { border-color: #f4a261; transform: scale(1.08); }
+  .day.checked .day-circle { background: #7cb342; border-color: #7cb342; color: #fff; }
+  .day.checked:hover .day-circle { background: #689f38; border-color: #689f38; }
+  .day.today .day-label { color: #b5651d; font-weight: 800; }
+  .day.today .day-circle { box-shadow: 0 0 0 2px #f4a261; }
+
+  /* ---- Календарный режим ---- */
+  .habit-selector {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+    scrollbar-width: thin;
+  }
+  .habit-selector::-webkit-scrollbar { height: 4px; }
+  .habit-selector::-webkit-scrollbar-thumb {
+    background: rgba(181, 101, 29, 0.2); border-radius: 2px;
+  }
+  .habit-pill {
+    font-family: inherit;
+    cursor: pointer;
+    border: 1.5px solid #ffd6a5;
+    background: #fff;
+    color: #8a4a12;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .habit-pill:hover { border-color: #f4a261; }
+  .habit-pill.active {
+    background: #b5651d;
+    color: #fff;
+    border-color: #b5651d;
+  }
+
+  .calendar-card {
+    background: #fff;
+    border: 1px solid #ffd6a5;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(181, 101, 29, 0.08);
+  }
+
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .cal-title {
+    font-size: 1.05rem;
+    color: #8a4a12;
+    font-weight: 700;
+    text-align: center;
+    flex: 1;
+  }
+  .cal-nav {
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: #fff1e0;
+    color: #b5651d;
+    border-radius: 9px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  .cal-nav:hover { background: #ffe8d6; }
+  .cal-nav:active { transform: scale(0.95); }
+
+  .cal-today-btn {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: #b5651d;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .cal-today-btn:hover { background: #8a4a12; }
+  .cal-today-btn:active { transform: scale(0.97); }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .calendar-weekdays span {
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #a06a3d;
+    text-transform: uppercase;
+    padding: 4px 0;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .cal-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid transparent;
+    border-radius: 9px;
+    background: #fff8f0;
+    color: #3d2b1f;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.12s;
+    font-family: inherit;
+    padding: 0;
+  }
+  .cal-cell.other-month {
+    background: transparent;
+    color: #d8c8b8;
+    cursor: default;
+    pointer-events: none;
+  }
+  .cal-cell.future {
+    color: #c8b8a8;
+    cursor: default;
+    pointer-events: none;
+    background: #fbf5ed;
+  }
+  .cal-cell.available:hover {
+    border-color: #f4a261;
+    transform: scale(1.06);
+  }
+  .cal-cell.checked {
+    background: #7cb342;
+    color: #fff;
+    border-color: #7cb342;
+  }
+  .cal-cell.checked:hover {
+    background: #689f38;
+    border-color: #689f38;
+  }
+  .cal-cell.today {
+    border: 2px solid #f4a261;
+    font-weight: 800;
+  }
+  .cal-cell.today.checked {
+    border-color: #b5651d;
+  }
+
+  .calendar-stats {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #8a4a12;
+    font-weight: 600;
+    padding: 10px 0 4px;
+    border-top: 1px dashed #ffd6a5;
+  }
+  .calendar-stats strong { color: #b5651d; }
+  .calendar-hint {
+    text-align: center;
+    font-size: 0.72rem;
+    color: #a06a3d;
+    opacity: 0.7;
+    margin-top: 6px;
+  }
+
+  /* ---- Пустое состояние ---- */
+  .empty-state {
+    text-align: center; padding: 48px 20px; color: #a06a3d;
+    background: #fff; border: 2px dashed #ffd6a5; border-radius: 14px;
+  }
+  .empty-state p:first-child { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+  .empty-state .hint { font-size: 0.85rem; opacity: 0.7; }
+
+  /* ---- Прогресс ---- */
+  .footer {
+    margin-top: 24px; padding: 16px 20px;
+    background: #fff; border: 1px solid #ffd6a5;
+    border-radius: 14px; box-shadow: 0 2px 8px rgba(181, 101, 29, 0.08);
+  }
+  .progress-label {
+    font-size: 0.85rem; color: #8a4a12; font-weight: 600;
+    margin-bottom: 8px; display: flex;
+    justify-content: space-between; align-items: center;
+  }
+  .progress-label strong { color: #b5651d; font-size: 1rem; }
+  .progress-bar { height: 8px; background: #ffd6a5; border-radius: 4px; overflow: hidden; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7cb342, #a3be8c);
+    border-radius: 4px; width: 0%;
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ---- Мобильный ---- */
+  @media (max-width: 480px) {
+    body { padding: 16px 12px; }
+    h1 { font-size: 1.4rem; }
+    .week { gap: 4px; }
+    .day-label { font-size: 0.6rem; }
+    .day-circle { max-width: 34px; font-size: 0.9rem; border-width: 1.5px; }
+    .habit { padding: 12px 14px; }
+    .habit-name { font-size: 0.92rem; }
+    .habit-streak { font-size: 0.72rem; padding: 2px 8px; }
+    .calendar-card { padding: 12px; }
+    .cal-title { font-size: 0.95rem; }
+    .cal-cell { font-size: 0.78rem; border-radius: 7px; }
+    .calendar-weekdays span { font-size: 0.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>✅ Трекер привычек</h1>
+    <p class="week-label" id="weekLabel"></p>
+  </header>
+
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" data-view="week">Неделя</button>
+    <button class="view-tab" data-view="calendar">Календарь</button>
+  </div>
+
+  <form class="add-form" id="addForm">
+    <input type="text" id="habitInput"
+           placeholder="Например: 💧 Пить 8 стаканов воды"
+           maxlength="60" autocomplete="off" required>
+    <button type="submit" aria-label="Добавить">+</button>
+  </form>
+
+  <!-- Режим: Неделя -->
+  <div class="view active" id="viewWeek">
+    <div class="habits" id="habits"></div>
+  </div>
+
+  <!-- Режим: Календарь -->
+  <div class="view" id="viewCalendar">
+    <div class="habit-selector" id="habitSelector"></div>
+    <div class="calendar-card">
+      <div class="calendar-header">
+        <button class="cal-nav" id="calPrev" aria-label="Предыдущий месяц">←</button>
+        <h2 class="cal-title" id="calTitle"></h2>
+        <button class="cal-nav" id="calNext" aria-label="Следующий месяц">→</button>
+      </div>
+      <button class="cal-today-btn" id="calToday">Сегодня</button>
+
+      <div class="calendar-weekdays">
+        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span>
+        <span>Пт</span><span>Сб</span><span>Вс</span>
+      </div>
+
+      <div class="calendar-grid" id="calendarGrid"></div>
+
+      <div class="calendar-stats" id="calendarStats"></div>
+      <div class="calendar-hint">Клик по прошедшему дню — отметить/снять. Будущие дни недоступны.</div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="progress-label">
+      <span>Сегодня выполнено</span>
+      <strong id="progressText">0 / 0</strong>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// 1. КОНСТАНТЫ
+// ============================================================
+var STORAGE_KEY = 'habit-tracker-v1';
+var DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+var MONTH_NAMES = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                   'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+var MONTH_NAMES_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                       'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+// ============================================================
+// 2. СОСТОЯНИЕ
+// ============================================================
+var habits = [];
+var viewMode = 'week';             // 'week' | 'calendar'
+var calendarYear = new Date().getFullYear();
+var calendarMonth = new Date().getMonth();
+var calendarHabitId = null;        // id привычки, которую смотрим в календаре
+
+// ============================================================
+// 3. DOM
+// ============================================================
+var addForm      = document.getElementById('addForm');
+var habitInput   = document.getElementById('habitInput');
+var habitsEl     = document.getElementById('habits');
+var weekLabel    = document.getElementById('weekLabel');
+var progressText = document.getElementById('progressText');
+var progressFill = document.getElementById('progressFill');
+
+var viewTabs        = document.getElementById('viewTabs');
+var viewWeekEl      = document.getElementById('viewWeek');
+var viewCalendarEl  = document.getElementById('viewCalendar');
+var habitSelector   = document.getElementById('habitSelector');
+var calPrev         = document.getElementById('calPrev');
+var calNext         = document.getElementById('calNext');
+var calToday        = document.getElementById('calToday');
+var calTitle        = document.getElementById('calTitle');
+var calendarGrid    = document.getElementById('calendarGrid');
+var calendarStats   = document.getElementById('calendarStats');
+
+// ============================================================
+// 4. ДАТЫ
+// ============================================================
+function iso(date) {
+  var y = date.getFullYear();
+  var m = String(date.getMonth() + 1).padStart(2, '0');
+  var d = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
+function getMonday(date) {
+  var d = new Date(date || new Date());
+  var day = d.getDay();
+  var diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getWeek() {
+  var monday = getMonday();
+  var days = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+  return days;
+}
+
+function formatWeekLabel(days) {
+  var start = days[0];
+  var end = days[6];
+  if (start.getMonth() === end.getMonth()) {
+    return 'Неделя: ' + start.getDate() + '–' + end.getDate() + ' ' +
+           MONTH_NAMES[end.getMonth()] + ' ' + end.getFullYear();
+  }
+  return 'Неделя: ' + start.getDate() + ' ' + MONTH_NAMES[start.getMonth()] +
+         ' – ' + end.getDate() + ' ' + MONTH_NAMES[end.getMonth()] +
+         ' ' + end.getFullYear();
+}
+
+// ============================================================
+// 5. LOCALSTORAGE
+// ============================================================
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+  } catch (e) { console.warn('Не удалось сохранить:', e); }
+}
+
+function load() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (Array.isArray(data)) {
+      habits = data.filter(function(h) {
+        return h && h.id && typeof h.name === 'string' &&
+               h.days && typeof h.days === 'object';
+      });
+    }
+  } catch (e) { console.warn('Не удалось загрузить:', e); }
+}
+
+// ============================================================
+// 6. СТРИК
+// ============================================================
+function getStreak(habit) {
+  var streak = 0;
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (!habit.days[iso(d)]) d.setDate(d.getDate() - 1);
+  while (habit.days[iso(d)]) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+    if (streak > 9999) break;
+  }
+  return streak;
+}
+
+// ============================================================
+// 7. ДЕЙСТВИЯ
+// ============================================================
+function addHabit(name) {
+  var trimmed = name.trim();
+  if (!trimmed) return;
+  habits.push({ id: Date.now().toString(), name: trimmed, days: {} });
+  save();
+  // В календаре сразу выбираем новую привычку
+  calendarHabitId = habits[habits.length - 1].id;
+  render();
+}
+
+function deleteHabit(id) {
+  var habit = habits.find(function(h) { return h.id === id; });
+  if (!habit) return;
+  if (!confirm('Удалить привычку «' + habit.name + '»?\nВся история отметок тоже удалится.')) return;
+
+  habits = habits.filter(function(h) { return h.id !== id; });
+
+  // Если удалили выбранную в календаре — переключаемся на первую доступную
+  if (calendarHabitId === id) {
+    calendarHabitId = habits.length > 0 ? habits[0].id : null;
+  }
+  save();
+  render();
+}
+
+function toggleDay(habitId, dateStr) {
+  var habit = habits.find(function(h) { return h.id === habitId; });
+  if (!habit) return;
+  if (habit.days[dateStr]) {
+    delete habit.days[dateStr];
+  } else {
+    habit.days[dateStr] = true;
+  }
+  save();
+  render();
+}
+
+// ============================================================
+// 8. ЭКРАНИРОВАНИЕ HTML
+// ============================================================
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, function(ch) {
+    if (ch === '\u0026') return '\u0026amp;';
+    if (ch === '\u003C') return '\u003C' + 'lt;';
+    if (ch === '\u003E') return '\u003E' + 'gt;';
+    if (ch === '\u0022') return '\u0022' + 'quot;';
+    if (ch === '\u0027') return '\u0027' + '#39;';
+    return ch;
+  });
+}
+
+// ============================================================
+// 9. РЕНДЕР — переключатель режимов
+// ============================================================
+function render() {
+  if (viewMode === 'week') {
+    weekLabel.style.display = '';
+    renderWeek();
+  } else {
+    weekLabel.style.display = 'none';
+    renderCalendar();
+  }
+
+  // Прогресс за сегодня — считаем всегда
+  var todayIso = iso(new Date());
+  var done = habits.filter(function(h) { return h.days[todayIso]; }).length;
+  updateProgress(done, habits.length);
+}
+
+function updateProgress(done, total) {
+  progressText.textContent = done + ' / ' + total;
+  var percent = total === 0 ? 0 : Math.round((done / total) * 100);
+  progressFill.style.width = percent + '%';
+}
+
+// ============================================================
+// 10. РЕНДЕР — неделя
+// ============================================================
+function renderWeek() {
+  var week = getWeek();
+  var todayIso = iso(new Date());
+
+  weekLabel.textContent = formatWeekLabel(week);
+
+  if (habits.length === 0) {
+    habitsEl.innerHTML =
+      '<div class="empty-state">' +
+        '<p>Пока нет привычек</p>' +
+        '<p class="hint">Добавь первую в поле выше 👆</p>' +
+      '</div>';
+    return;
+  }
+
+  habitsEl.innerHTML = habits.map(function(habit, idx) {
+    var streak = getStreak(habit);
+
+    var dayButtons = week.map(function(date, i) {
+      var dateStr = iso(date);
+      var isToday = dateStr === todayIso;
+      var isChecked = !!habit.days[dateStr];
+      var classes = ['day', isChecked ? 'checked' : '', isToday ? 'today' : '']
+                    .filter(Boolean).join(' ');
+
+      return '<button class="' + classes + '"' +
+             ' data-habit-id="' + habit.id + '"' +
+             ' data-date="' + dateStr + '"' +
+             ' aria-label="' + DAY_NAMES[i] + ', ' + date.getDate() +
+               ' — ' + (isChecked ? 'выполнено' : 'не выполнено') + '">' +
+             '<span class="day-label">' + DAY_NAMES[i] + '</span>' +
+             '<span class="day-circle">' + (isChecked ? '✓' : '') + '</span>' +
+             '</button>';
+    }).join('');
+
+    return '<div class="habit" data-id="' + habit.id + '"' +
+           ' style="animation-delay:' + (idx * 0.03) + 's">' +
+             '<div class="habit-header">' +
+               '<span class="habit-name">' + escapeHtml(habit.name) + '</span>' +
+               '<span class="habit-streak ' + (streak === 0 ? 'zero' : '') + '">🔥 ' + streak + '</span>' +
+               '<button class="habit-delete" data-delete-id="' + habit.id + '" aria-label="Удалить привычку">✕</button>' +
+             '</div>' +
+             '<div class="week">' + dayButtons + '</div>' +
+           '</div>';
+  }).join('');
+}
+
+// ============================================================
+// 11. РЕНДЕР — календарь
+// ============================================================
+function renderCalendar() {
+  // Пусто — нет привычек
+  if (habits.length === 0) {
+    habitSelector.innerHTML = '';
+    calendarGrid.innerHTML = '';
+    calTitle.textContent = MONTH_NAMES_NOM[calendarMonth] + ' ' + calendarYear;
+    calendarStats.innerHTML = '';
+    calendarGrid.parentElement.style.display = 'none';
+    habitSelector.innerHTML =
+      '<div class="empty-state" style="width:100%">' +
+        '<p>Пока нет привычек</p>' +
+        '<p class="hint">Добавь привычку — и сможешь отмечать дни в календаре</p>' +
+      '</div>';
+    return;
+  }
+  calendarGrid.parentElement.style.display = '';
+
+  // Если выбранная привычка удалена / не выбрана — берём первую
+  var currentHabit = habits.find(function(h) { return h.id === calendarHabitId; });
+  if (!currentHabit) {
+    calendarHabitId = habits[0].id;
+    currentHabit = habits[0];
+  }
+
+  // Пилюли привычек
+  habitSelector.innerHTML = habits.map(function(h) {
+    var active = h.id === calendarHabitId ? ' active' : '';
+    return '<button class="habit-pill' + active + '" data-select-id="' + h.id + '">' +
+             escapeHtml(h.name) +
+           '</button>';
+  }).join('');
+
+  // Заголовок месяца
+  calTitle.textContent = MONTH_NAMES_NOM[calendarMonth] + ' ' + calendarYear;
+
+  // Сетка календаря
+  var firstDay = new Date(calendarYear, calendarMonth, 1);
+  var offset = (firstDay.getDay() + 6) % 7;   // 0=Пн, 6=Вс
+  var daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  var totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
+
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var todayIso = iso(today);
+
+  var cells = [];
+  for (var i = 0; i < totalCells; i++) {
+    var dayNum = i - offset + 1;
+    if (dayNum < 1 || dayNum > daysInMonth) {
+      cells.push('<div class="cal-cell other-month"></div>');
+      continue;
+    }
+
+    var thisDate = new Date(calendarYear, calendarMonth, dayNum);
+    thisDate.setHours(0, 0, 0, 0);
+    var thisIso = iso(thisDate);
+    var isFuture = thisDate.getTime() > today.getTime();
+    var isToday = thisIso === todayIso;
+    var isChecked = !!currentHabit.days[thisIso];
+
+    var cls = ['cal-cell'];
+    if (isFuture) cls.push('future');
+    else cls.push('available');
+    if (isChecked) cls.push('checked');
+    if (isToday) cls.push('today');
+
+    var title = MONTH_NAMES[calendarMonth] + ' ' + dayNum + ', ' +
+                (isFuture ? 'будущее' : (isChecked ? 'выполнено' : 'не выполнено'));
+
+    cells.push('<button class="' + cls.join(' ') + '"' +
+               ' data-date="' + thisIso + '"' +
+               ' title="' + title + '"' +
+               (isFuture ? ' disabled' : '') + '>' +
+               dayNum +
+               '</button>');
+  }
+  calendarGrid.innerHTML = cells.join('');
+
+  // Статистика месяца
+  var monthStart = new Date(calendarYear, calendarMonth, 1);
+  var monthEnd = new Date(calendarYear, calendarMonth + 1, 0);
+  var endForCount = monthEnd.getTime() > today.getTime() ? today : monthEnd;
+
+  var totalPassed = 0;
+  if (endForCount.getTime() >= monthStart.getTime()) {
+    totalPassed = endForCount.getDate();
+  }
+
+  var doneCount = 0;
+  for (var key in currentHabit.days) {
+    if (!currentHabit.days.hasOwnProperty(key)) continue;
+    if (!currentHabit.days[key]) continue;
+    var parts = key.split('-');
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10) - 1;
+    if (y === calendarYear && m === calendarMonth) doneCount++;
+  }
+
+  if (totalPassed === 0) {
+    calendarStats.innerHTML = 'Месяц ещё не начался';
+  } else {
+    calendarStats.innerHTML = 'Выполнено <strong>' + doneCount +
+                              '</strong> из <strong>' + totalPassed + '</strong> прошедших дней';
+  }
+}
+
+// ============================================================
+// 12. СОБЫТИЯ
+// ============================================================
+
+// Форма добавления
+addForm.addEventListener('submit', function(e) {
+  e.preventDefault();
+  addHabit(habitInput.value);
+  habitInput.value = '';
+  habitInput.focus();
+});
+
+// Клики по неделям
+habitsEl.addEventListener('click', function(e) {
+  var delBtn = e.target.closest('[data-delete-id]');
+  if (delBtn) {
+    e.stopPropagation();
+    deleteHabit(delBtn.dataset.deleteId);
+    return;
+  }
+  var dayBtn = e.target.closest('.day');
+  if (dayBtn) {
+    toggleDay(dayBtn.dataset.habitId, dayBtn.dataset.date);
+  }
+});
+
+// Переключение режимов
+viewTabs.addEventListener('click', function(e) {
+  var tab = e.target.closest('.view-tab');
+  if (!tab) return;
+  var v = tab.dataset.view;
+  if (v === viewMode) return;
+
+  viewMode = v;
+  viewTabs.querySelectorAll('.view-tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.view === v);
+  });
+  viewWeekEl.classList.toggle('active', v === 'week');
+  viewCalendarEl.classList.toggle('active', v === 'calendar');
+  render();
+});
+
+// Выбор привычки в календаре
+habitSelector.addEventListener('click', function(e) {
+  var pill = e.target.closest('[data-select-id]');
+  if (!pill) return;
+  calendarHabitId = pill.dataset.selectId;
+  renderCalendar();
+});
+
+// Навигация по месяцам
+calPrev.addEventListener('click', function() {
+  calendarMonth--;
+  if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+  renderCalendar();
+});
+calNext.addEventListener('click', function() {
+  calendarMonth++;
+  if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+  renderCalendar();
+});
+calToday.addEventListener('click', function() {
+  var now = new Date();
+  calendarYear = now.getFullYear();
+  calendarMonth = now.getMonth();
+  renderCalendar();
+});
+
+// Клики по дням календаря
+calendarGrid.addEventListener('click', function(e) {
+  var cell = e.target.closest('.cal-cell');
+  if (!cell) return;
+  if (cell.classList.contains('future')) return;
+  if (cell.classList.contains('other-month')) return;
+  if (!calendarHabitId) return;
+  toggleDay(calendarHabitId, cell.dataset.date);
+});
+
+// ============================================================
+// 13. СТАРТ
+// ============================================================
+load();
+if (habits.length > 0) calendarHabitId = habits[0].id;
+render();
+</script>
+
+</body>
+</html>

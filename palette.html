@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор палитр</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f0f12;
+    --surface: #1a1a22;
+    --surface-hover: #23232e;
+    --text: #f0f0f5;
+    --text-dim: #8888a0;
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --border: rgba(255,255,255,0.08);
+    --radius: 14px;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 820px;
+    height: calc(100vh - 40px);
+    max-height: 720px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+  }
+
+  /* ---------- Шапка ---------- */
+  .header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .header-left h1 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-left p {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+
+  /* ---------- Вкладки ---------- */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.25);
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .tab {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .tab:not(.active):hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  /* ---------- Кнопки ---------- */
+  .actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+    padding: 8px 13px;
+    border-radius: 9px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.1s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    background: #2d2d3a;
+    border-color: rgba(255,255,255,0.15);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  /* ---------- Основная область ---------- */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 16px 20px 20px;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  /* ---------- Палитра ---------- */
+  .palette {
+    flex: 1;
+    display: grid;
+    gap: 8px;
+    min-height: 0;
+    border-radius: 12px;
+  }
+  .palette.random-mode {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: 1fr;
+    overflow: visible;
+  }
+  .palette.presets-mode {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-auto-rows: min-content;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+  }
+  .palette.presets-mode::-webkit-scrollbar { width: 6px; }
+  .palette.presets-mode::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+
+  /* ---------- Свотч (случайный режим) ---------- */
+  .swatch {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 8px;
+    cursor: pointer;
+    min-width: 0;
+    position: relative;
+    border-radius: 10px;
+    will-change: transform;
+    transition:
+      background 0.35s ease,
+      transform 0.28s ease-out,
+      box-shadow 0.28s ease;
+    animation: fadeIn 0.3s ease backwards;
+  }
+  .swatch:hover {
+    transform: scale(1.04);
+    z-index: 2;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+  }
+
+  .swatch.light { color: #1a1a1a; }
+  .swatch.dark { color: #fff; }
+
+  .swatch .hex {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: clamp(0.68rem, 1.1vw, 0.9rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    user-select: all;
+    text-align: center;
+    word-break: break-all;
+    line-height: 1.3;
+  }
+
+  .swatch .lock {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0.95rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.28);
+    backdrop-filter: blur(4px);
+    transition: transform 0.2s, background 0.2s;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .swatch.light .lock { background: rgba(0,0,0,0.1); }
+  .swatch .lock:hover { transform: scale(1.1); }
+
+  /* ---------- Пресеты ---------- */
+  .preset-card {
+    background: var(--surface-hover);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border);
+    animation: fadeIn 0.3s ease backwards;
+  }
+  .preset-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+  }
+  .preset-colors {
+    display: flex;
+    height: 58px;
+  }
+  .preset-colors span {
+    flex: 1;
+    transition: flex 0.2s;
+  }
+  .preset-card:hover .preset-colors span { flex: 1.15; }
+  .preset-info {
+    padding: 8px 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .preset-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .preset-license {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.06);
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ---------- Подвал ---------- */
+  .footer {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* ---------- Тост ---------- */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translate(-50%, 20px);
+    background: rgba(0,0,0,0.9);
+    color: #fff;
+    padding: 11px 20px;
+    border-radius: 11px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 300;
+    backdrop-filter: blur(8px);
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- Модалка осмотра пресета ---------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .modal-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    padding: 22px;
+    transform: scale(0.92);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+  .modal-overlay.show .modal-card {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .modal-title-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .modal-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .modal-license {
+    align-self: flex-start;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.06);
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .modal-close {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  .modal-close:hover {
+    background: #3a2a3a;
+    transform: rotate(90deg);
+  }
+
+  /* Свотчи внутри модалки */
+  .modal-colors {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .modal-swatch {
+    height: 120px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 8px 4px;
+    position: relative;
+    will-change: transform;
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease;
+    animation: swatchPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .modal-swatch:hover {
+    transform: scale(1.06);
+    z-index: 2;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+  .modal-swatch.light { color: #1a1a1a; }
+  .modal-swatch.dark { color: #fff; }
+
+  .modal-swatch .hex {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: clamp(0.55rem, 1.6vw, 0.7rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-align: center;
+    word-break: break-all;
+    user-select: all;
+    line-height: 1.2;
+  }
+
+  /* Галочка при копировании */
+  .modal-swatch.copied::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    border-radius: inherit;
+    animation: copiedFade 1.1s ease forwards;
+    pointer-events: none;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .modal-footer .btn {
+    padding: 10px 16px;
+    font-size: 0.82rem;
+  }
+
+  /* ---------- Кейфреймы ---------- */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes swatchPop {
+    from { opacity: 0; transform: scale(0.7) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @keyframes copiedFade {
+    0%   { opacity: 0; transform: scale(0.5); }
+    20%  { opacity: 1; transform: scale(1); }
+    80%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.2); }
+  }
+
+  /* ---------- Адаптив ---------- */
+  @media (max-width: 680px) {
+    body { padding: 10px; }
+    .app { height: calc(100vh - 20px); max-height: none; }
+    .header { padding: 12px 14px; gap: 10px; }
+    .header-left p { display: none; }
+    .tabs { order: 3; width: 100%; }
+    .tab { flex: 1; text-align: center; }
+    .actions { order: 2; }
+    .btn { flex: 1; justify-content: center; text-align: center; padding: 7px 10px; font-size: 0.74rem; }
+    .main { padding: 12px 14px 14px; gap: 10px; }
+    .palette.random-mode {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(5, 1fr);
+    }
+    .swatch {
+      flex-direction: row;
+      justify-content: space-between;
+      padding: 10px 16px;
+    }
+    .swatch:hover { transform: scale(1.03); }
+    .swatch .hex { font-size: 0.82rem; }
+    .footer { padding: 8px 14px; font-size: 0.65rem; }
+    .toast { font-size: 0.78rem; padding: 9px 14px; bottom: 14px; }
+    .palette.presets-mode {
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+
+    /* Модалка на телефоне: свотчи в столбик */
+    .modal-overlay { padding: 12px; }
+    .modal-card { padding: 18px; border-radius: 14px; }
+    .modal-title { font-size: 1rem; }
+    .modal-colors {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .modal-swatch {
+      height: auto;
+      flex-direction: row;
+      justify-content: space-between;
+      padding: 14px 16px;
+    }
+    .modal-swatch .hex { font-size: 0.82rem; }
+    .modal-swatch:hover { transform: scale(1.02); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1>🎨 Генератор палитр</h1>
+        <p>Клик по цвету — скопировать HEX · Пробел — новая · C — копировать всё</p>
+      </div>
+
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="random">Случайная</button>
+        <button class="tab" data-tab="presets">Бесплатные палитры</button>
+      </div>
+
+      <div class="actions" id="actions">
+        <button class="btn btn-primary" id="generateBtn">🎲 Новая</button>
+        <button class="btn" id="copyAllBtn">📋 Всё</button>
+        <button class="btn" id="exportBtn">🖼 PNG</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="palette random-mode" id="palette"></div>
+    </main>
+
+    <footer class="footer">
+      <span>HEX · RGB · HSL</span>
+      <span id="modeLabel">Случайная палитра</span>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Модалка осмотра пресета -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card" id="modalCard" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <h2 class="modal-title" id="modalTitle"></h2>
+          <span class="modal-license" id="modalLicense"></span>
+        </div>
+        <button class="modal-close" id="modalClose" aria-label="Закрыть">✕</button>
+      </div>
+
+      <div class="modal-colors" id="modalColors"></div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="modalCopyAll">📋 Скопировать всю палитру</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// 1. КОНСТАНТЫ И СОСТОЯНИЕ
+// ============================================================
+
+const COUNT = 5;
+const STORAGE_KEY = 'palette-generator-state-v1';
+
+let locks = Array(COUNT).fill(false);
+let colors = [];
+let activeTab = 'random';
+let openPresetIndex = null;   // индекс открытого пресета или null
+
+// ============================================================
+// 2. БЕСПЛАТНЫЕ ПАЛИТРЫ (CC0, MIT, Apache)
+// ============================================================
+
+const PRESETS = [
+  { name: 'Nord', colors: ['#2E3440','#3B4252','#88C0D0','#81A1C1','#A3BE8C'], license: 'MIT' },
+  { name: 'Dracula', colors: ['#282A36','#44475A','#BD93F9','#50FA7B','#FF79C6'], license: 'MIT' },
+  { name: 'Catppuccin Mocha', colors: ['#1E1E2E','#313244','#89B4FA','#A6E3A1','#F38BA8'], license: 'MIT' },
+  { name: 'Catppuccin Latte', colors: ['#EFF1F5','#DCE0E8','#1E66F5','#40A02B','#D20F39'], license: 'MIT' },
+  { name: 'Gruvbox Dark', colors: ['#282828','#3C3836','#83A598','#B8BB26','#FB4934'], license: 'MIT' },
+  { name: 'Gruvbox Light', colors: ['#FBF1C7','#EBDBB2','#458588','#98971A','#CC241D'], license: 'MIT' },
+  { name: 'Solarized Dark', colors: ['#002B36','#073642','#268BD2','#859900','#DC322F'], license: 'MIT' },
+  { name: 'Solarized Light', colors: ['#FDF6E3','#EEE8D5','#268BD2','#859900','#DC322F'], license: 'MIT' },
+  { name: 'Monokai', colors: ['#272822','#3E3D32','#66D9EF','#A6E22E','#F92672'], license: 'MIT' },
+  { name: 'One Dark', colors: ['#282C34','#3E4451','#61AFEF','#98C379','#E06C75'], license: 'MIT' },
+  { name: 'Tokyo Night', colors: ['#24283B','#1F2335','#7AA2F7','#9ECE6A','#F7768E'], license: 'MIT' },
+  { name: 'Rosé Pine', colors: ['#191724','#1F1D2E','#9CCFD8','#EBBCBA','#F6C177'], license: 'MIT' },
+  { name: 'Everforest', colors: ['#2D353B','#343F44','#7FBBB3','#A7C080','#DBBC7F'], license: 'MIT' },
+  { name: 'Kanagawa', colors: ['#1F1F28','#2A2A37','#7E9CD8','#98BB6C','#E46876'], license: 'MIT' },
+  { name: 'Ayu Mirage', colors: ['#212733','#242936','#73D0FF','#BAE67E','#F28779'], license: 'MIT' },
+  { name: 'Material Design', colors: ['#212121','#424242','#2196F3','#4CAF50','#F44336'], license: 'Apache 2.0' },
+  { name: 'Tailwind Slate', colors: ['#0F172A','#1E293B','#3B82F6','#22C55E','#EF4444'], license: 'MIT' },
+  { name: 'Open Color', colors: ['#212529','#343A40','#5C7CFA','#40C057','#FA5252'], license: 'MIT' },
+  { name: 'CC0 Pastel', colors: ['#FFD6A5','#FDFFB6','#CAFFBF','#9BF6FF','#A0C4FF'], license: 'CC0' },
+  { name: 'CC0 Earth', colors: ['#D4A373','#FAEDCD','#CCD5AE','#A3B18A','#588157'], license: 'CC0' }
+];
+
+// ============================================================
+// 3. DOM
+// ============================================================
+
+const paletteEl  = document.getElementById('palette');
+const toastEl    = document.getElementById('toast');
+const tabsEl     = document.getElementById('tabs');
+const generateBtn = document.getElementById('generateBtn');
+const copyAllBtn  = document.getElementById('copyAllBtn');
+const exportBtn   = document.getElementById('exportBtn');
+const modeLabel   = document.getElementById('modeLabel');
+
+const modalOverlay = document.getElementById('modalOverlay');
+const modalCard    = document.getElementById('modalCard');
+const modalTitle   = document.getElementById('modalTitle');
+const modalLicense = document.getElementById('modalLicense');
+const modalColors  = document.getElementById('modalColors');
+const modalClose   = document.getElementById('modalClose');
+const modalCopyAll = document.getElementById('modalCopyAll');
+
+// ============================================================
+// 4. УТИЛИТЫ
+// ============================================================
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+}
+
+function randomColor() {
+  const h = Math.floor(Math.random() * 360);
+  const s = 55 + Math.floor(Math.random() * 30);
+  const l = 45 + Math.floor(Math.random() * 20);
+  return hslToHex(h, s, l);
+}
+
+function isLight(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+}
+
+let toastTimer;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+// ============================================================
+// 5. LOCALSTORAGE
+// ============================================================
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ colors, locks }));
+  } catch {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.colors) && data.colors.length === COUNT &&
+        Array.isArray(data.locks) && data.locks.length === COUNT) {
+      colors = data.colors;
+      locks = data.locks;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// ============================================================
+// 6. ОТРИСОВКА
+// ============================================================
+
+function renderRandom() {
+  paletteEl.className = 'palette random-mode';
+  paletteEl.innerHTML = colors.map((hex, i) => `
+    <div class="swatch ${isLight(hex) ? 'light' : 'dark'}"
+         style="background:${hex}; animation-delay:${i * 0.04}s"
+         data-index="${i}"
+         title="Клик — скопировать ${hex.toUpperCase()}">
+      <button class="lock" aria-label="${locks[i] ? 'Разблокировать' : 'Закрепить'} цвет">
+        ${locks[i] ? '🔒' : '🔓'}
+      </button>
+      <span class="hex">${hex.toUpperCase()}</span>
+    </div>
+  `).join('');
+}
+
+function renderPresets() {
+  paletteEl.className = 'palette presets-mode';
+  paletteEl.innerHTML = PRESETS.map((p, i) => `
+    <div class="preset-card"
+         data-preset-index="${i}"
+         style="animation-delay:${i * 0.02}s"
+         title="Клик — открыть для осмотра">
+      <div class="preset-colors">
+        ${p.colors.map(c => `<span style="background:${c}"></span>`).join('')}
+      </div>
+      <div class="preset-info">
+        <span class="preset-name">${p.name}</span>
+        <span class="preset-license">${p.license}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function render() {
+  if (activeTab === 'random') {
+    renderRandom();
+    modeLabel.textContent = 'Случайная палитра';
+  } else {
+    renderPresets();
+    modeLabel.textContent = 'Бесплатные палитры · клик — осмотр';
+  }
+}
+
+// ============================================================
+// 7. ДЕЙСТВИЯ (случайная палитра)
+// ============================================================
+
+function generate() {
+  colors = Array.from({ length: COUNT }, (_, i) => {
+    if (colors[i] && locks[i]) return colors[i];
+    return randomColor();
+  });
+  render();
+  saveState();
+}
+
+async function copyColor(i) {
+  const hex = colors[i].toUpperCase();
+  const ok = await copyText(hex);
+  showToast(ok ? `Скопировано: ${hex}` : `Не удалось скопировать ${hex}`);
+}
+
+async function copyAll() {
+  const all = colors.map(c => c.toUpperCase()).join(', ');
+  const ok = await copyText(all);
+  showToast(ok ? 'Вся палитра скопирована' : 'Не удалось скопировать');
+}
+
+function toggleLock(i) {
+  locks[i] = !locks[i];
+  render();
+  saveState();
+  showToast(locks[i]
+    ? `Цвет ${colors[i].toUpperCase()} закреплён`
+    : 'Цвет разблокирован');
+}
+
+// ============================================================
+// 8. ЭКСПОРТ В PNG
+// ============================================================
+
+function exportPNG() {
+  const scale = 2;
+  const sw = 180;
+  const sh = 280;
+  const W = sw * COUNT;
+  const H = sh;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = '#0f0f12';
+  ctx.fillRect(0, 0, W, H);
+
+  colors.forEach((hex, i) => {
+    const x = i * sw;
+    ctx.fillStyle = hex;
+    ctx.fillRect(x, 0, sw, H);
+
+    const label = hex.toUpperCase();
+    ctx.font = '700 14px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = isLight(hex) ? '#1a1a1a' : '#ffffff';
+    ctx.fillText(label, x + sw / 2, H - 18);
+
+    ctx.font = '500 11px system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = isLight(hex) ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.35)';
+    ctx.fillText(`#${i + 1}`, x + sw / 2, 12);
+  });
+
+  canvas.toBlob(blob => {
+    if (!blob) { showToast('Не удалось создать PNG'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `palette-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PNG сохранён 🖼');
+  }, 'image/png');
+}
+
+// ============================================================
+// 9. МОДАЛКА ПРЕСЕТА
+// ============================================================
+
+function openPresetModal(index) {
+  const preset = PRESETS[index];
+  if (!preset) return;
+
+  openPresetIndex = index;
+
+  modalTitle.textContent = preset.name;
+  modalLicense.textContent = preset.license;
+
+  modalColors.innerHTML = preset.colors.map((hex, i) => `
+    <div class="modal-swatch ${isLight(hex) ? 'light' : 'dark'}"
+         style="background:${hex}; animation-delay:${0.05 + i * 0.05}s"
+         data-hex="${hex.toUpperCase()}"
+         title="Клик — скопировать ${hex.toUpperCase()}">
+      <span class="hex">${hex.toUpperCase()}</span>
+    </div>
+  `).join('');
+
+  modalOverlay.classList.add('show');
+}
+
+function closePresetModal() {
+  openPresetIndex = null;
+  modalOverlay.classList.remove('show');
+}
+
+async function copyPresetColor(el, hex) {
+  const ok = await copyText(hex);
+  showToast(ok ? `Скопировано: ${hex}` : 'Не удалось скопировать');
+  if (!ok) return;
+
+  // Перезапуск анимации галочки, даже если кликнули повторно
+  el.classList.remove('copied');
+  void el.offsetWidth;   // принудительный reflow — так анимация перезапустится
+  el.classList.add('copied');
+  setTimeout(() => el.classList.remove('copied'), 1200);
+}
+
+async function copyPresetAll() {
+  const preset = PRESETS[openPresetIndex];
+  if (!preset) return;
+  const text = preset.colors.map(c => c.toUpperCase()).join(', ');
+  const ok = await copyText(text);
+  showToast(ok
+    ? `«${preset.name}» скопирована (${preset.license})`
+    : 'Не удалось скопировать');
+}
+
+// ============================================================
+// 10. ВКЛАДКИ
+// ============================================================
+
+function switchTab(tab) {
+  activeTab = tab;
+  tabsEl.querySelectorAll('.tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+
+  const isRandom = tab === 'random';
+  generateBtn.style.display = isRandom ? '' : 'none';
+  copyAllBtn.style.display  = isRandom ? '' : 'none';
+  exportBtn.style.display   = isRandom ? '' : 'none';
+
+  render();
+}
+
+// ============================================================
+// 11. СОБЫТИЯ
+// ============================================================
+
+// Клики внутри палитры
+paletteEl.addEventListener('click', (e) => {
+  // Режим пресетов: клик по карточке → открыть модалку осмотра
+  const presetCard = e.target.closest('.preset-card');
+  if (presetCard) {
+    openPresetModal(Number(presetCard.dataset.presetIndex));
+    return;
+  }
+
+  // Режим случайной палитры
+  const lockBtn = e.target.closest('.lock');
+  if (lockBtn) {
+    e.stopPropagation();
+    toggleLock(Number(lockBtn.closest('.swatch').dataset.index));
+    return;
+  }
+  const swatch = e.target.closest('.swatch');
+  if (swatch) copyColor(Number(swatch.dataset.index));
+});
+
+// Клики внутри модалки
+modalColors.addEventListener('click', (e) => {
+  const sw = e.target.closest('.modal-swatch');
+  if (sw) copyPresetColor(sw, sw.dataset.hex);
+});
+
+modalClose.addEventListener('click', closePresetModal);
+modalCopyAll.addEventListener('click', copyPresetAll);
+
+// Клик по фону модалки (вне карточки) — закрыть
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) closePresetModal();
+});
+
+// Вкладки
+tabsEl.addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (tab) switchTab(tab.dataset.tab);
+});
+
+// Кнопки
+generateBtn.addEventListener('click', generate);
+copyAllBtn.addEventListener('click', copyAll);
+exportBtn.addEventListener('click', exportPNG);
+
+// Горячие клавиши
+document.addEventListener('keydown', (e) => {
+  // Esc закрывает модалку — проверяем первым
+  if (e.key === 'Escape' && openPresetIndex !== null) {
+    closePresetModal();
+    return;
+  }
+
+  if (e.target.matches('input, textarea, button')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (activeTab !== 'random') return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    generate();
+  } else if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'с') {
+    copyAll();
+  }
+});
+
+// ============================================================
+// 12. СТАРТ
+// ============================================================
+
+if (loadState()) {
+  render();
+  showToast('Палитра восстановлена');
+} else {
+  generate();
+}
+</script>
+
+</body>
+</html>
